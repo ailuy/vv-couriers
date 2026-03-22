@@ -172,10 +172,17 @@ with st.sidebar:
 
     st.markdown("""
     <div style="font-size:12px;color:#aaa;line-height:1.6">
-    Еженедельный мониторинг рынка труда курьеров в Москве. 
-    Отслеживает условия работы, удержание и стратегии 16 конкурентов ВкусВилла — 
-    от ставок и бонусов до продуктовых решений. 
+    Еженедельный мониторинг рынка труда курьеров в Москве. Отслеживает условия работы,
+    удержание и стратегии конкурентов — от ставок и бонусов до продуктовых решений.
     Обновляется автоматически каждое воскресенье.
+    </div>
+    <div style="font-size:11px;color:#666;line-height:1.5;margin-top:10px">
+    <b style="color:#888">Почему эти компании:</b><br>
+    Прямые конкуренты за курьеров — дарксторы и экспресс-доставка (Самокат, Яндекс Лавка,
+    Купер, Магнит, Ozon Fresh, Пятёрочка, Перекрёсток, Чижик, Впрок, Достависта).
+    Косвенные конкуренты — банки и финтех (Сбер, Т-Банк, Альфа), которые переманивают
+    самозанятых с авто в роль «полевого представителя». Wildberries и СДЭК —
+    крупнейшие работодатели курьеров в Москве с пересекающейся аудиторией.
     </div>
     """, unsafe_allow_html=True)
 
@@ -531,20 +538,31 @@ elif page == "📄 Дайджест":
     # Таблица по алфавиту из живых данных (не из дайджеста)
     competitors_live = signals_data.get("competitors", {})
     if competitors_live:
+        # Легенда статусов
+        st.markdown("""
+        <div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px;flex-wrap:wrap">
+            <span style="color:#2DB551">📈 улучшилось — свежие позитивные изменения</span>
+            <span style="color:#E8504A">📉 ухудшилось — свежие негативные изменения</span>
+            <span style="color:#29B6F6">➡️ без изменений — хронические проблемы, ничего нового</span>
+            <span style="color:#B0BEC5">❓ нет данных — нет свежих источников за 1-2 месяца</span>
+        </div>
+        """, unsafe_allow_html=True)
+
         rows = ""
         for employer in sorted(competitors_live.keys()):
             data = competitors_live[employer]
             status = data.get("retention_score_change", "нет данных")
             reasoning = data.get("retention_score_reasoning", "")
+            short = reasoning
             color = COLORS.get(status, "#B0BEC5")
             emoji = RETENTION_EMOJI.get(status, "❓")
-            # Обрезаем reasoning до 100 символов
-            short_reason = reasoning[:100] + "..." if len(reasoning) > 100 else reasoning
-            rows += f"""<tr>
-                <td style="padding:8px 12px;color:#e0e0e0;font-weight:600">{employer}</td>
-                <td style="padding:8px 12px;color:{color};font-weight:600;white-space:nowrap">
-                    {emoji} {status}</td>
-                <td style="padding:8px 12px;color:#aaa;font-size:13px">{short_reason}</td>
+            rows += f"""<tr style="border-bottom:1px solid #2a2d3e">
+                <td style="padding:8px 12px;color:#e0e0e0;font-weight:600;
+                           white-space:nowrap;width:140px">{employer}</td>
+                <td style="padding:8px 12px;color:{color};font-weight:600;
+                           white-space:nowrap;width:160px">{emoji} {status}</td>
+                <td style="padding:8px 12px;color:#aaa;font-size:13px;
+                           line-height:1.5">{short}</td>
             </tr>"""
 
         st.markdown(f"""
@@ -552,27 +570,61 @@ elif page == "📄 Дайджест":
             <thead>
                 <tr style="border-bottom:2px solid #2DB551">
                     <th style="padding:8px 12px;text-align:left;color:#2DB551;
-                               font-size:12px;font-weight:600">Конкурент</th>
+                               font-size:12px;font-weight:600;width:140px">Конкурент</th>
                     <th style="padding:8px 12px;text-align:left;color:#2DB551;
-                               font-size:12px;font-weight:600;white-space:nowrap">
-                               Статус удержания</th>
+                               font-size:12px;font-weight:600;width:160px">Статус</th>
                     <th style="padding:8px 12px;text-align:left;color:#2DB551;
                                font-size:12px;font-weight:600">Причина</th>
                 </tr>
             </thead>
-            <tbody style="border-top:1px solid #2a2d3e">
+            <tbody>
                 {rows}
             </tbody>
         </table>
         """, unsafe_allow_html=True)
 
-    # ── По конкурентам ───────────────────────────────────────────────────
-    if "## По конкурентам" in digest_text:
-        st.markdown('<div class="section-header">По конкурентам</div>',
-                    unsafe_allow_html=True)
-        comp_block = digest_text.split("## По конкурентам")[1]
-        comp_block = comp_block.split("##")[0].strip()
-        # Рендерим — жирные заголовки зелёным
-        st.markdown(render_digest_block(comp_block), unsafe_allow_html=True)
+    # ── По конкурентам — из живых данных ────────────────────────────────
+    st.markdown('<div class="section-header">По конкурентам · высокоприоритетные сигналы</div>',
+                unsafe_allow_html=True)
+
+    if competitors_live:
+        for employer in sorted(competitors_live.keys()):
+            data = competitors_live[employer]
+            high = [s for s in data.get("signals", [])
+                    if s.get("importance") == "высокая"]
+            if not high:
+                continue
+            status = data.get("retention_score_change", "нет данных")
+            color = COLORS.get(status, "#B0BEC5")
+            emoji = RETENTION_EMOJI.get(status, "❓")
+
+            st.markdown(f"""
+            <div style="margin-top:16px;margin-bottom:6px">
+                <span style="font-size:15px;font-weight:700;color:#e0e0e0">{employer}</span>
+                <span style="font-size:12px;color:{color};font-weight:600;
+                             margin-left:10px">{emoji} {status}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            for s in high[:4]:
+                type_label = SIGNAL_TYPE_LABELS.get(s.get("type", ""), s.get("type", ""))
+                source = s.get("source", "")
+                source_html = (f'<a href="{source}" target="_blank" '
+                              f'style="color:#29B6F6;font-size:11px">↗ источник</a>'
+                              if source != "нет источника" else "")
+                imp_colors = {"высокая": "#E8504A", "средняя": "#29B6F6",
+                              "низкая": "#B0BEC5"}
+                border_color = imp_colors.get(s.get("importance", "низкая"), "#B0BEC5")
+                st.markdown(f"""
+                <div style="background:#1e2130;border-radius:8px;padding:10px 14px;
+                            margin-bottom:6px;border-left:3px solid {border_color};
+                            border:1px solid #2a2d3e">
+                    <div style="font-size:11px;color:#888;margin-bottom:4px">{type_label}</div>
+                    <div style="font-size:13px;line-height:1.5;color:#e0e0e0">
+                        {s.get('summary', '')}
+                    </div>
+                    <div style="margin-top:4px">{source_html}</div>
+                </div>
+                """, unsafe_allow_html=True)
     else:
-        st.info("Текст дайджеста недоступен.")
+        st.info("Нет данных для отображения.")
