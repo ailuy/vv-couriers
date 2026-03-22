@@ -1,7 +1,5 @@
 import streamlit as st
 import json
-import subprocess
-import sys
 import os
 from pathlib import Path
 from datetime import datetime
@@ -172,64 +170,19 @@ with st.sidebar:
 
     st.divider()
 
-    # Запуск сбора
-    st.markdown("**Управление**")
-
-    if st.button("🚀 Запустить сбор данных", use_container_width=True,
-                 type="primary"):
-        st.session_state["running"] = True
-        st.session_state["run_output"] = ""
-
-    if st.button("🧠 Только анализ", use_container_width=True):
-        st.session_state["running_analyzer"] = True
-
-    # Статус последнего запуска
-    run_log = load_run_log()
-    if run_log:
-        last = run_log[-1]
-        st.divider()
-        st.markdown("**Последний запуск**")
-        st.caption(f"🕐 {last['run_at']}")
-        status_color = "🟢" if last["status"] == "ok" else "🟡"
-        st.caption(f"{status_color} {last['status']} · "
-                  f"{last['total_elapsed']//60:.0f}м {last['total_elapsed']%60:.0f}с")
+    st.markdown("""
+    <div style="font-size:12px;color:#aaa;line-height:1.6">
+    Еженедельный мониторинг рынка труда курьеров в Москве. 
+    Отслеживает условия работы, удержание и стратегии 16 конкурентов ВкусВилла — 
+    от ставок и бонусов до продуктовых решений. 
+    Обновляется автоматически каждое воскресенье.
+    </div>
+    """, unsafe_allow_html=True)
 
 
-# ─── Запуск скриптов ────────────────────────────────────────────────────────
-
-if st.session_state.get("running"):
-    st.session_state["running"] = False
-    with st.spinner("Запускаем сбор данных... (~30 минут)"):
-        result = subprocess.run(
-            [sys.executable, "run_monitor.py"],
-            capture_output=True, text=True,
-            encoding="utf-8", timeout=3600,
-            env={**os.environ, "ANTHROPIC_API_KEY":
-                 os.environ.get("ANTHROPIC_API_KEY", "")}
-        )
-        st.session_state["run_output"] = result.stdout + result.stderr
-    st.cache_data.clear()
-    st.success("✅ Сбор завершён!")
-
-if st.session_state.get("running_analyzer"):
-    st.session_state["running_analyzer"] = False
-    with st.spinner("Генерируем дайджест..."):
-        result = subprocess.run(
-            [sys.executable, "analyzer.py"],
-            capture_output=True, text=True,
-            encoding="utf-8", timeout=600,
-            env={**os.environ}
-        )
-        st.session_state["run_output"] = result.stdout
-    st.cache_data.clear()
-    st.success("✅ Дайджест обновлён!")
-
-if st.session_state.get("run_output"):
-    with st.expander("📋 Лог последнего запуска"):
-        st.markdown(
-            f'<div class="run-status">{st.session_state["run_output"]}</div>',
-            unsafe_allow_html=True
-        )
+# ─── Запуск скриптов — только локально ──────────────────────────────────────
+# Кнопки управления убраны из облачной версии.
+# Сбор данных запускается автоматически через GitHub Actions каждое воскресенье.
 
 
 # ════════════════════════════════════════════════════════════════════════════
