@@ -1,0 +1,52 @@
+name: Weekly Courier Monitor
+
+on:
+  schedule:
+    # Каждое воскресенье в 07:00 UTC (10:00 МСК)
+    - cron: '0 7 * * 0'
+  workflow_dispatch:  # Позволяет запускать вручную из GitHub UI
+
+jobs:
+  collect-and-analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
+        with:
+          # Нужны права на коммит обновлённых данных
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Настройка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Установка зависимостей
+        run: pip install -r requirements.txt
+
+      - name: Запуск сбора данных — HH.ru
+        run: python hh_collector.py
+
+      - name: Запуск сбора данных — карьерные страницы
+        run: python career_scraper.py
+
+      - name: Запуск Claude web_search
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python claude_search.py
+
+      - name: Генерация дайджеста
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python analyzer.py
+
+      - name: Коммит обновлённых данных
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+          git diff --staged --quiet || git commit -m "Weekly update: $(date +'%Y-%m-%d')"
+          git push

@@ -1,0 +1,25 @@
+# Не коммитим снапшоты карьерных страниц — они большие и меняются каждую неделю
+# Коммитим только latest файлы для дашборда
+
+data/career_snapshots/
+data/career_pages_2*.json
+data/hh_vacancies_2*.json
+data/claude_signals_2*.json
+data/digest_2*.json
+
+# Оставляем latest файлы — их читает дашборд
+!data/career_pages_latest.json
+!data/hh_vacancies_latest.json
+!data/claude_signals_latest.json
+!data/digest_latest.json
+!data/run_log.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# OS
+.DS_Store
+Thumbs.db
