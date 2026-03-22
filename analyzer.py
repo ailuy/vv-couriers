@@ -63,11 +63,17 @@ def prepare_context(data: dict) -> str:
 
             if high_signals:
                 parts.append("Высокоприоритетные сигналы:")
-                for s in high_signals:
-                    parts.append(f"- [{s['type']}] {s['summary']}")
+                for s in high_signals[:5]:  # максимум 5 на конкурента
+                    parts.append(f"- [{s['type']}] {s['summary'][:200]}")
             elif all_signals:
-                parts.append(f"Сигналов высокой важности нет. "
-                            f"Всего сигналов: {len(all_signals)}")
+                # Если нет высоких — берём первые 2 средних
+                medium = [s for s in all_signals if s.get("importance") == "средняя"]
+                if medium:
+                    parts.append("Сигналы средней важности:")
+                    for s in medium[:2]:
+                        parts.append(f"- [{s['type']}] {s['summary'][:200]}")
+                else:
+                    parts.append("Сигналов высокой важности нет.")
             else:
                 parts.append("Данных нет.")
             parts.append("")
@@ -106,7 +112,8 @@ def prepare_context(data: dict) -> str:
 
 
 def generate_digest(context: str, client: anthropic.Anthropic) -> str:
-    """Генерируем дайджест через Claude."""
+    """Генерируем дайджест через Claude с retry при rate limit."""
+    import time
     today = datetime.now().strftime("%Y-%m-%d")
 
     prompt = f"""На основе данных ниже составь еженедельный дайджест по рынку труда курьеров в Москве.
@@ -126,8 +133,7 @@ def generate_digest(context: str, client: anthropic.Anthropic) -> str:
 ## Retention радар
 Таблица в формате Markdown:
 | Конкурент | Статус | Причина (одна фраза) |
-Включи всех конкурентов из данных. ВкусВилл — добавь отдельной строкой как точку отсчёта 
-(на основе своих знаний о позиции ВВ на рынке).
+Включи всех конкурентов из данных. ВкусВилл — добавь отдельной строкой как точку отсчёта.
 
 ## По конкурентам
 Только те у кого есть сигналы высокой важности. Для каждого:
@@ -135,7 +141,7 @@ def generate_digest(context: str, client: anthropic.Anthropic) -> str:
 - Перечень высокоприоритетных сигналов
 
 ## Аналитика
-**Что рынок делает с удержанием:** (2-3 предложения — общий тренд)
+**Что рынок делает с удержанием:** (2-3 предложения)
 
 **Где ВВ выигрывает прямо сейчас:** (конкретно)
 
@@ -143,14 +149,21 @@ def generate_digest(context: str, client: anthropic.Anthropic) -> str:
 
 **Что стоит проверить или сделать:** (одна конкретная рекомендация)"""
 
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=6000,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    for attempt in range(1, 4):
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=6000,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.content[0].text
+        except anthropic.RateLimitError:
+            wait = 60 * attempt
+            print(f"  ⚠️  Rate limit, жду {wait}с (попытка {attempt}/3)...")
+            time.sleep(wait)
 
-    return response.content[0].text
+    raise RuntimeError("Rate limit: все попытки исчерпаны")
 
 
 def generate_json_summary(data: dict, digest_text: str,
